@@ -87,13 +87,6 @@ const navTabs = [
             {{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}
           </span>
         </button>
-
-        <div
-          class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-space-xs text-on-primary shadow-sm select-none"
-          title="Profil utilisateur"
-        >
-          <span class="material-symbols-outlined text-[18px]">person</span>
-        </div>
       </div>
     </div>
   </header>
