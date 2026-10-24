@@ -26,14 +26,15 @@ function handleStartTaskSession() {
 
 <template>
   <div class="bg-surface font-body-md text-body-md text-on-surface antialiased flex flex-col min-h-screen">
-    <!-- Barre d'en-tête supérieure fixe -->
+    <!-- Barre d'en-tête supérieure avec navigation intégrée sur PC -->
     <HeaderBar
       :current-tab="currentTab"
+      @update:current-tab="currentTab = $event"
       @open-sound-modal="openSoundModal"
     />
 
-    <!-- Contenu principal avec padding haut (header) et bas (bottom nav) -->
-    <main class="flex-1 flex flex-col relative w-full pt-20 pb-24 px-margin max-w-lg mx-auto">
+    <!-- Contenu principal adaptable PC & Mobile -->
+    <main class="flex-1 flex flex-col relative w-full pt-20 pb-24 lg:pb-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
       <Transition name="fade-slide" mode="out-in">
         <FocusView
           v-if="currentTab === 'focus'"
@@ -52,7 +53,7 @@ function handleStartTaskSession() {
       </Transition>
     </main>
 
-    <!-- Navigation inférieure fixe -->
+    <!-- Navigation inférieure mobile uniquement (masquée sur PC) -->
     <BottomNav
       :active-tab="currentTab"
       @update:active-tab="currentTab = $event"
@@ -67,7 +68,7 @@ function handleStartTaskSession() {
 </template>
 
 <style scoped>
-/* Transition douce et feutrée entre les onglets, fidèle à la quiétude cognitive */
+/* Transition douce et feutrée entre les vues */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;

@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 
 /**
  * Catégories de focus prédéfinies avec leurs codes couleurs du design system Serene Focus.
@@ -11,15 +11,13 @@ export const FOCUS_CATEGORIES = [
 ]
 
 /**
- * État partagé (Singleton pattern via Composable)
- * Cela permet de conserver l'état du timer même lorsqu'on navigue entre les onglets (Focus, Timeline, Tâches, Bilan).
+ * État partagé (Singleton réactif)
  */
 const durationMinutes = ref(25)
 const remainingSeconds = ref(25 * 60)
 const isRunning = ref(false)
-const intention = ref('')
 const selectedCategory = ref(FOCUS_CATEGORIES[0])
-const completedSessionsToday = ref(3) // sessions initiales de démonstration réaliste
+const completedSessionsToday = ref(3)
 const totalMinutesToday = ref(115) // 1h55
 
 let timerInterval = null
@@ -36,38 +34,53 @@ export function useTimer() {
   })
 
   /**
-   * Calcul de l'angle de l'aiguille en degrés (0° à 360°)
-   * Une minute = 6 degrés. On calcule au dixième de seconde pour une fluidité analogique.
+   * Détermine si le cadran doit être un cercle complet plein (ex: 60 min)
+   * Corrige le bug où 60 min faisait disparaître le rouge !
    */
-  const needleRotation = computed(() => {
-    const currentMins = remainingSeconds.value / 60
-    return (currentMins % 60) * 6
+  const isFullCircle = computed(() => {
+    return remainingSeconds.value >= 3600
   })
 
   /**
-   * Calcul du chemin SVG (d) pour le secteur coloré (wedge)
+   * Calcul de l'angle en degrés (0° à 360°)
+   * Pour 60 min -> 360° (et non pas 0° modulo !)
+   * Pour 45 min -> 270°
+   * Pour 25 min -> 150°
+   * Pour 15 min -> 90°
+   */
+  const currentDegrees = computed(() => {
+    const secs = remainingSeconds.value
+    if (secs <= 0) return 0
+    if (secs >= 3600) return 360
+    return (secs / 3600) * 360
+  })
+
+  /**
+   * Angle de rotation de l'aiguille
+   */
+  const needleRotation = computed(() => {
+    return currentDegrees.value
+  })
+
+  /**
+   * Calcul géométrique du chemin SVG (d) pour le secteur coloré (wedge)
    * Centre du cadran : (120, 120), rayon : 92.
-   * L'angle part de midi (12h, -90° trigonométrique) et tourne dans le sens horaire.
+   * L'angle part de 12h (-90° cartésien) et tourne dans le sens horaire.
    */
   const svgWedgePath = computed(() => {
-    const mins = remainingSeconds.value / 60
-    const degrees = Math.min((mins % 60) * 6, 359.99)
+    const deg = currentDegrees.value
 
-    // Cas où le cadran est vide ou à 0
-    if (degrees <= 0.1) {
-      return ''
-    }
+    // Si 0 seconde restante, aucun secteur
+    if (deg <= 0.1) return ''
 
-    // Cas où le temps couvre 60 minutes pleines
-    if (degrees >= 359.9) {
-      return 'M 120 120 L 120 28 A 92 92 0 1 1 119.99 28 Z'
-    }
+    // Si 60 minutes ou plus : cercle complet
+    if (deg >= 359.5) return 'FULL'
 
-    // Conversion en radians (-90 degrés pour commencer au sommet / 12h)
-    const radians = (degrees - 90) * (Math.PI / 180)
+    // Formule trigonométrique cartésienne
+    const radians = (deg - 90) * (Math.PI / 180)
     const endX = 120 + 92 * Math.cos(radians)
     const endY = 120 + 92 * Math.sin(radians)
-    const largeArc = degrees > 180 ? 1 : 0
+    const largeArc = deg > 180 ? 1 : 0
 
     return `M 120 120 L 120 28 A 92 92 0 ${largeArc} 1 ${endX.toFixed(1)} ${endY.toFixed(1)} Z`
   })
@@ -89,19 +102,17 @@ export function useTimer() {
   })
 
   /**
-   * Pourcentage d'avancement de la session en cours
+   * État de pause active (la session a commencé mais est actuellement suspendue)
    */
-  const progressRatio = computed(() => {
-    const totalSecs = durationMinutes.value * 60
-    if (totalSecs <= 0) return 0
-    return Math.max(0, Math.min(1, 1 - remainingSeconds.value / totalSecs))
+  const isPaused = computed(() => {
+    return !isRunning.value && remainingSeconds.value < durationMinutes.value * 60 && remainingSeconds.value > 0
   })
 
   /**
    * Sélection d'une durée prédéfinie (15, 25, 45, 60 minutes)
    */
   function setDuration(mins) {
-    if (isRunning.value) return // Empêche de modifier en cours de session active
+    if (isRunning.value) return // Empêche de modifier pendant que ça tourne
     durationMinutes.value = mins
     remainingSeconds.value = mins * 60
   }
@@ -114,10 +125,7 @@ export function useTimer() {
   }
 
   /**
-   * Démarre le minuteur avec synchronisation basée sur le timestamp système
-   * Pourquoi un timestamp plutôt qu'un simple decrement ?
-   * -> Dans les navigateurs et WebViews, les intervalles sont throttle lorsque l'onglet ou l'écran est en veille.
-   * -> En comparant le temps réel Date.now(), le timer reste mathématiquement exact sans dérive temporelle !
+   * Démarre la session de concentration
    */
   function startSession() {
     if (remainingSeconds.value <= 0) {
@@ -135,7 +143,7 @@ export function useTimer() {
       } else {
         remainingSeconds.value = Math.ceil(msLeft / 1000)
       }
-    }, 250) // cadence rapide pour un affichage réactif
+    }, 250)
   }
 
   /**
@@ -145,6 +153,22 @@ export function useTimer() {
     isRunning.value = false
     clearInterval(timerInterval)
     timerInterval = null
+  }
+
+  /**
+   * Arrête définitivement la session en cours et réinitialise le cadran
+   * Comptabilise les minutes effectivement travaillées si > 1 min
+   */
+  function stopSession() {
+    pauseSession()
+    const totalSecs = durationMinutes.value * 60
+    const elapsedSecs = totalSecs - remainingSeconds.value
+
+    if (elapsedSecs >= 60) {
+      totalMinutesToday.value += Math.floor(elapsedSecs / 60)
+    }
+
+    remainingSeconds.value = durationMinutes.value * 60
   }
 
   /**
@@ -159,27 +183,17 @@ export function useTimer() {
   }
 
   /**
-   * Réinitialise le minuteur à la durée initiale
-   */
-  function resetSession() {
-    pauseSession()
-    remainingSeconds.value = durationMinutes.value * 60
-  }
-
-  /**
    * Fin de session réussie
    */
   function completeSession() {
     pauseSession()
     completedSessionsToday.value += 1
     totalMinutesToday.value += durationMinutes.value
-
-    // Notification sonore discrète si supportée
     playChime()
   }
 
   /**
-   * Gong subtil de fin de session via l'API Web Audio (aucun fichier MP3 requis !)
+   * Gong subtil de fin de session via l'API Web Audio
    */
   function playChime() {
     try {
@@ -189,7 +203,6 @@ export function useTimer() {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
 
-      // Fréquence douce 528 Hz (note apaisante "Solfeggio")
       osc.type = 'sine'
       osc.frequency.setValueAtTime(528, ctx.currentTime)
 
@@ -211,21 +224,22 @@ export function useTimer() {
     durationMinutes,
     remainingSeconds,
     isRunning,
-    intention,
+    isPaused,
+    isFullCircle,
+    currentDegrees,
     selectedCategory,
     categories: FOCUS_CATEGORIES,
     formattedTime,
     needleRotation,
     svgWedgePath,
     horizonWindow,
-    progressRatio,
     completedSessionsToday,
     totalMinutesToday,
     setDuration,
     setCategory,
     startSession,
     pauseSession,
+    stopSession,
     toggleSession,
-    resetSession,
   }
 }
