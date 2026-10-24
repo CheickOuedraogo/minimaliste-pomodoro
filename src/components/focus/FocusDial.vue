@@ -1,17 +1,65 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useTimer } from '../../composables/useTimer'
 
 const {
   formattedTime,
-  needleRotation,
-  svgWedgePath,
   horizonWindow,
-  isRunning,
+  currentDegrees,
+  isFullCircle,
 } = useTimer()
 
-// Génération des 60 graduations horlogères
-// Rayon externe : 100, rayon interne majeurs (tous les 5 min) : 90, rayon interne mineurs : 95
+// Angle animé de manière continue et soyeuse (Lerp via requestAnimationFrame)
+const animatedDegrees = ref(currentDegrees.value)
+let animFrameId = null
+
+function stepAnimation() {
+  const target = currentDegrees.value
+  const diff = target - animatedDegrees.value
+
+  if (Math.abs(diff) > 0.08) {
+    // Amorti doux (easing 0.16)
+    animatedDegrees.value += diff * 0.16
+    animFrameId = requestAnimationFrame(stepAnimation)
+  } else {
+    animatedDegrees.value = target
+    animFrameId = null
+  }
+}
+
+watch(currentDegrees, () => {
+  if (!animFrameId) {
+    animFrameId = requestAnimationFrame(stepAnimation)
+  }
+})
+
+onMounted(() => {
+  animatedDegrees.value = currentDegrees.value
+})
+
+onUnmounted(() => {
+  if (animFrameId) cancelAnimationFrame(animFrameId)
+})
+
+// Détermine si le disque rouge est plein
+const isVisuallyFull = computed(() => {
+  return animatedDegrees.value >= 359.5 || isFullCircle.value
+})
+
+// Calcul trigonométrique du secteur rouge animé
+const animatedWedgePath = computed(() => {
+  const deg = animatedDegrees.value
+  if (deg <= 0.1 || isVisuallyFull.value) return ''
+
+  const radians = (deg - 90) * (Math.PI / 180)
+  const endX = 120 + 92 * Math.cos(radians)
+  const endY = 120 + 92 * Math.sin(radians)
+  const largeArc = deg > 180 ? 1 : 0
+
+  return `M 120 120 L 120 28 A 92 92 0 ${largeArc} 1 ${endX.toFixed(2)} ${endY.toFixed(2)} Z`
+})
+
+// 60 graduations horlogères Dieter Rams / Braun
 const ticks = computed(() => {
   const result = []
   const cx = 120
@@ -44,14 +92,14 @@ const ticks = computed(() => {
 
 <template>
   <section class="flex flex-col items-center justify-center my-1 select-none">
-    <!-- Cadran analogique Braun-like -->
-    <div class="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center">
+    <!-- Cadran analogique Braun agrandi et sublime sur mobile & PC -->
+    <div class="relative w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 flex items-center justify-center">
       <svg class="absolute inset-0 w-full h-full" viewBox="0 0 240 240">
         <defs>
           <radialGradient id="dialSectorGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#ffdad6" stop-opacity="0.4" />
-            <stop offset="70%" stop-color="#ff847d" stop-opacity="0.6" />
-            <stop offset="100%" stop-color="#ab2d2a" stop-opacity="0.85" />
+            <stop offset="0%" stop-color="#ffdad6" stop-opacity="0.45" />
+            <stop offset="70%" stop-color="#ff847d" stop-opacity="0.65" />
+            <stop offset="100%" stop-color="#ab2d2a" stop-opacity="0.9" />
           </radialGradient>
         </defs>
 
@@ -61,12 +109,20 @@ const ticks = computed(() => {
         <!-- Cercle repère fin -->
         <circle cx="120" cy="120" r="92" fill="none" stroke="#e6e2e0" stroke-width="1" />
 
-        <!-- Secteur dynamique coloré représentant le temps restant -->
-        <path
-          v-if="svgWedgePath"
-          :d="svgWedgePath"
+        <!-- Cercle plein pour 60 minutes (garantit que le rouge est 100% visible sans bug) -->
+        <circle
+          v-if="isVisuallyFull"
+          cx="120"
+          cy="120"
+          r="92"
           fill="url(#dialSectorGrad)"
-          class="transition-all duration-300"
+        />
+
+        <!-- Secteur dynamique coloré pour les durées intermédiaires -->
+        <path
+          v-else-if="animatedWedgePath"
+          :d="animatedWedgePath"
+          fill="url(#dialSectorGrad)"
         />
 
         <!-- 60 graduations d'horlogerie -->
@@ -86,10 +142,10 @@ const ticks = computed(() => {
         </g>
       </svg>
 
-      <!-- Aiguille indicatrice pivotante -->
+      <!-- Aiguille indicatrice pivotante animée avec fluidité mécanique -->
       <div
-        class="absolute w-full h-full pointer-events-none transition-transform duration-300 ease-out"
-        :style="{ transform: `rotate(${needleRotation}deg)` }"
+        class="absolute w-full h-full pointer-events-none"
+        :style="{ transform: `rotate(${animatedDegrees}deg)` }"
       >
         <div
           class="absolute left-1/2 top-[34px] -translate-x-1/2 w-[3.5px] h-[86px] bg-primary rounded-full shadow-[0_2px_8px_rgba(171,45,42,0.35)]"
@@ -97,7 +153,7 @@ const ticks = computed(() => {
       </div>
 
       <!-- Pivot central en porcelaine tactile -->
-      <div class="relative w-11 h-11 rounded-full bg-surface-container-lowest shadow-[0_3px_10px_rgba(0,0,0,0.08)] flex items-center justify-center z-10">
+      <div class="relative w-11 h-11 lg:w-12 lg:h-12 rounded-full bg-surface-container-lowest shadow-[0_3px_10px_rgba(0,0,0,0.08)] flex items-center justify-center z-10">
         <div class="w-4 h-4 rounded-full bg-surface-container-high flex items-center justify-center">
           <div class="w-1.5 h-1.5 rounded-full bg-primary" />
         </div>
@@ -106,7 +162,7 @@ const ticks = computed(() => {
 
     <!-- Affichage digital & Horizon d'accomplissement -->
     <div class="flex flex-col items-center mt-3 mb-4">
-      <div class="font-display text-display text-on-surface tracking-tighter tabular-nums">
+      <div class="font-display text-display lg:text-[46px] text-on-surface tracking-tighter tabular-nums">
         {{ formattedTime }}
       </div>
       <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container mt-1.5">
