@@ -17,7 +17,7 @@ const navItems = [
 </script>
 
 <template>
-  <nav class="fixed bottom-0 w-full z-40 pb-safe bg-surface/85 backdrop-blur-xl shadow-[0_-1px_12px_rgba(0,0,0,0.03)] border-t border-surface-container/40">
+  <nav class="lg:hidden fixed bottom-0 w-full z-40 pb-safe bg-surface/85 backdrop-blur-xl shadow-[0_-1px_12px_rgba(0,0,0,0.03)] border-t border-surface-container/40">
     <div class="flex justify-around items-center h-16 px-gutter max-w-lg mx-auto">
       <button
         v-for="item in navItems"
