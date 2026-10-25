@@ -56,28 +56,7 @@ const tracks = ref([
 ])
 
 // Playlists de l'utilisateur
-const defaultPlaylists = [
-  {
-    id: 'deep-focus',
-    title: 'Immersion Profonde',
-    tracksCount: 3,
-    icon: 'headphones',
-    tracks: [
-      { id: 't1', title: 'Pluie d\'Automne 432Hz', source: 'synth', preset: 'pluie' },
-      { id: 't2', title: 'Ondes Alpha Café Lofi', source: 'synth', preset: 'cafe' },
-    ],
-  },
-  {
-    id: 'ambient-nature',
-    title: 'Calme Naturel',
-    tracksCount: 2,
-    icon: 'park',
-    tracks: [
-      { id: 't3', title: 'Bruine & Vent', source: 'synth', preset: 'pluie' },
-      { id: 't4', title: 'Forêt boréale', source: 'synth', preset: 'foret' },
-    ],
-  },
-]
+const defaultPlaylists = []
 
 const savedPlaylists = localStorage.getItem('focus_playlists')
 const playlists = ref(savedPlaylists ? JSON.parse(savedPlaylists) : defaultPlaylists)
@@ -85,24 +64,7 @@ const activePlaylistId = ref(null)
 
 // YouTube links list
 const savedYouTube = localStorage.getItem('focus_youtube_links')
-const youtubeLinks = ref(
-  savedYouTube
-    ? JSON.parse(savedYouTube)
-    : [
-        {
-          id: 'yt-1',
-          title: 'Lofi Girl - Synthwave & Ambient Beats',
-          url: 'https://www.youtube.com/watch?v=4xDzrJKXOOY',
-          videoId: '4xDzrJKXOOY',
-        },
-        {
-          id: 'yt-2',
-          title: 'Deep Focus Music - Binaural Beats for Study',
-          url: 'https://www.youtube.com/watch?v=WPni755-Krg',
-          videoId: 'WPni755-Krg',
-        },
-      ]
-)
+const youtubeLinks = ref(savedYouTube ? JSON.parse(savedYouTube) : [])
 
 const activeYouTubeId = ref(null)
 const isYouTubePlaying = ref(false)

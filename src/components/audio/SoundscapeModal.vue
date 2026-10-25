@@ -299,6 +299,10 @@ function triggerFileInput() {
                 </button>
               </div>
             </div>
+
+            <div v-if="playlists.length === 0" class="text-center py-6 text-tertiary font-body-sm text-[13px]">
+              Aucune playlist créée. Donnez un nom ci-dessus pour démarrer votre première collection.
+            </div>
           </div>
         </div>
 
@@ -376,6 +380,10 @@ function triggerFileInput() {
                   <span class="material-symbols-outlined text-[16px]">delete</span>
                 </button>
               </div>
+            </div>
+
+            <div v-if="youtubeLinks.length === 0" class="text-center py-6 text-tertiary font-body-sm text-[13px]">
+              Aucun flux YouTube enregistré. Collez un lien vidéo ci-dessus pour l'ajouter.
             </div>
           </div>
 
