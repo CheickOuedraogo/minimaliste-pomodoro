@@ -3,9 +3,9 @@ import { ref } from 'vue'
 import HeaderBar from './components/navigation/HeaderBar.vue'
 import BottomNav from './components/navigation/BottomNav.vue'
 import FocusView from './components/focus/FocusView.vue'
-import TimelineView from './components/timeline/TimelineView.vue'
 import TasksView from './components/tasks/TasksView.vue'
-import BilanView from './components/bilan/BilanView.vue'
+import ActivityView from './components/activity/ActivityView.vue'
+import SettingsView from './components/settings/SettingsView.vue'
 import SoundscapeModal from './components/audio/SoundscapeModal.vue'
 
 const currentTab = ref('focus')
@@ -40,15 +40,15 @@ function handleStartTaskSession() {
           v-if="currentTab === 'focus'"
           @open-sound-modal="openSoundModal"
         />
-        <TimelineView
-          v-else-if="currentTab === 'timeline'"
-        />
         <TasksView
           v-else-if="currentTab === 'tasks'"
           @start-task-session="handleStartTaskSession"
         />
-        <BilanView
-          v-else-if="currentTab === 'bilan'"
+        <ActivityView
+          v-else-if="currentTab === 'activity'"
+        />
+        <SettingsView
+          v-else-if="currentTab === 'settings'"
         />
       </Transition>
     </main>
@@ -68,7 +68,6 @@ function handleStartTaskSession() {
 </template>
 
 <style scoped>
-/* Transition douce et feutrée entre les vues */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;

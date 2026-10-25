@@ -10,9 +10,9 @@ const emit = defineEmits(['update:activeTab'])
 
 const navItems = [
   { id: 'focus', label: 'Focus', icon: 'timer' },
-  { id: 'timeline', label: 'Timeline', icon: 'calendar_today' },
   { id: 'tasks', label: 'Tâches', icon: 'check_circle' },
-  { id: 'bilan', label: 'Bilan', icon: 'bar_chart' },
+  { id: 'activity', label: 'Activité', icon: 'bar_chart' },
+  { id: 'settings', label: 'Paramètres', icon: 'settings' },
 ]
 </script>
 
