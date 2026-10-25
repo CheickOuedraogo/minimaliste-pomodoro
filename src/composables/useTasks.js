@@ -1,11 +1,6 @@
 import { ref, computed } from 'vue'
 
-const defaultTasks = [
-  { id: 1, title: 'Architecture & Modélisation technique', done: true, category: 'Recherche' },
-  { id: 2, title: 'Cadran analogique Braun & calcul SVG', done: false, category: 'Deep Work' },
-  { id: 3, title: 'Mixeur d’ambiance sonore & flux YouTube', done: false, category: 'Deep Work' },
-  { id: 4, title: 'Revue des micro-animations & layout PC', done: false, category: 'Écriture' },
-]
+const defaultTasks = []
 
 const saved = localStorage.getItem('focus_tasks_list')
 const tasks = ref(saved ? JSON.parse(saved) : defaultTasks)

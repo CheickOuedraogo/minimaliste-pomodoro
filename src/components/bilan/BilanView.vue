@@ -1,27 +1,62 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useSessions } from '../../composables/useSessions'
+import { useTasks } from '../../composables/useTasks'
+
+const { currentWeekDays, getCategoriesStats, getTotalMinutes, getSessionCount } = useSessions()
+const { completedTasks } = useTasks()
 
 const currentPeriod = ref('today') // 'today' | 'week' | 'month'
 
-const categoriesBreakdown = [
-  { name: 'Deep Work', percent: 55, color: '#ab2d2a', time: '1h 55' },
-  { name: 'Écriture', percent: 25, color: '#a13d39', time: '0h 50' },
-  { name: 'Recherche', percent: 20, color: '#7e7271', time: '0h 40' },
-]
+// Statistiques par catégorie pour la période choisie
+const categoriesBreakdown = computed(() => {
+  return getCategoriesStats(currentPeriod.value)
+})
 
-const weekBars = [
-  { day: 'Lun', height: '65%', time: '2h45' },
-  { day: 'Mar', height: '80%', time: '3h10' },
-  { day: 'Mer', height: '50%', time: '1h55', isToday: true },
-  { day: 'Jeu', height: '20%', time: '0h45' },
-  { day: 'Ven', height: '0%', time: '0h00' },
-  { day: 'Sam', height: '0%', time: '0h00' },
-  { day: 'Dim', height: '0%', time: '0h00' },
-]
+// Minutes totales pour la période
+const totalMinutesPeriod = computed(() => {
+  return getTotalMinutes(currentPeriod.value)
+})
+
+const formattedPeriodTime = computed(() => {
+  const mins = totalMinutesPeriod.value
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return `${h}h ${String(m).padStart(2, '0')}`
+})
+
+// Nombre de sessions pour la période
+const sessionCountPeriod = computed(() => {
+  return getSessionCount(currentPeriod.value)
+})
+
+// Barres hebdomadaires dynamiques
+const weekBars = computed(() => {
+  const maxMinutes = Math.max(...currentWeekDays.value.map(d => d.minutes), 60) // échelle min 60m
+  return currentWeekDays.value.map(d => {
+    const heightPercent = d.minutes > 0 ? Math.round((d.minutes / maxMinutes) * 100) : 0
+    return {
+      day: d.name,
+      height: `${Math.max(heightPercent, 4)}%`,
+      hasData: d.minutes > 0,
+      time: d.minutes > 0 ? d.totalTime : '0h 00',
+      isToday: d.isToday,
+    }
+  })
+})
+
+// Moyenne quotidienne de la semaine
+const weeklyAverageTime = computed(() => {
+  const totalMins = currentWeekDays.value.reduce((acc, d) => acc + d.minutes, 0)
+  const avg = Math.round(totalMins / 7)
+  const h = Math.floor(avg / 60)
+  const m = avg % 60
+  return `${h}h ${String(m).padStart(2, '0')}/j`
+})
 </script>
 
 <template>
-  <div class="flex flex-col w-full gap-space-lg select-none pb-12">
+  <div class="flex flex-col w-full gap-space-lg select-none pb-12 max-w-2xl mx-auto">
     <!-- Intro & Sélecteur temporel -->
     <div class="flex flex-col gap-space-sm">
       <div class="flex items-center justify-between">
@@ -36,7 +71,7 @@ const weekBars = [
         <div class="flex items-center gap-space-2xs bg-surface-container-high px-space-xs py-space-2xs rounded-full">
           <span class="w-2 h-2 rounded-full bg-primary inline-block" />
           <span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
-            Sync OK
+            Données locales
           </span>
         </div>
       </div>
@@ -78,9 +113,11 @@ const weekBars = [
           <span class="font-label-sm text-[10px] uppercase tracking-wide truncate">Concentré</span>
         </div>
         <div class="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight">
-          3h 25
+          {{ formattedPeriodTime }}
         </div>
-        <div class="font-body-sm text-[11px] text-outline mt-1">sur 4h00 prévu</div>
+        <div class="font-body-sm text-[11px] text-outline mt-1">
+          {{ totalMinutesPeriod > 0 ? 'temps accumulé' : 'aucune session' }}
+        </div>
       </div>
 
       <div class="flex flex-col bg-surface-container-lowest p-space-md rounded-2xl shadow-sm border border-surface-container">
@@ -89,9 +126,11 @@ const weekBars = [
           <span class="font-label-sm text-[10px] uppercase tracking-wide truncate">Sessions</span>
         </div>
         <div class="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight">
-          5
+          {{ sessionCountPeriod }}
         </div>
-        <div class="font-body-sm text-[11px] text-outline mt-1">100% complétées</div>
+        <div class="font-body-sm text-[11px] text-outline mt-1">
+          {{ sessionCountPeriod > 0 ? 'réalisées' : 'à démarrer' }}
+        </div>
       </div>
 
       <div class="flex flex-col bg-surface-container-lowest p-space-md rounded-2xl shadow-sm border border-surface-container">
@@ -100,9 +139,11 @@ const weekBars = [
           <span class="font-label-sm text-[10px] uppercase tracking-wide truncate">Tâches</span>
         </div>
         <div class="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight">
-          4
+          {{ completedTasks.length }}
         </div>
-        <div class="font-body-sm text-[11px] text-outline mt-1">sans interruption</div>
+        <div class="font-body-sm text-[11px] text-outline mt-1">
+          accomplie{{ completedTasks.length > 1 ? 's' : '' }}
+        </div>
       </div>
     </div>
 
@@ -112,21 +153,26 @@ const weekBars = [
         <span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider">
           Répartition de l'attention
         </span>
-        <span class="font-label-sm text-label-sm text-primary font-medium">3 catégories</span>
+        <span class="font-label-sm text-label-sm text-primary font-medium">
+          {{ categoriesBreakdown.length }} catégorie{{ categoriesBreakdown.length > 1 ? 's' : '' }}
+        </span>
       </div>
 
-      <!-- Barre de proportion multicouleur -->
-      <div class="w-full h-3 rounded-full bg-surface-container overflow-hidden flex">
+      <!-- Barre de proportion multicouleur (si données) -->
+      <div
+        v-if="categoriesBreakdown.length > 0"
+        class="w-full h-3 rounded-full bg-surface-container overflow-hidden flex"
+      >
         <div
           v-for="cat in categoriesBreakdown"
           :key="cat.name"
           :style="{ width: `${cat.percent}%`, backgroundColor: cat.color }"
-          class="h-full first:rounded-l-full last:rounded-r-full"
+          class="h-full first:rounded-l-full last:rounded-r-full transition-all duration-300"
         />
       </div>
 
-      <!-- Légende -->
-      <div class="flex flex-col gap-2 pt-1">
+      <!-- Légende ou message vide -->
+      <div v-if="categoriesBreakdown.length > 0" class="flex flex-col gap-2 pt-1">
         <div
           v-for="cat in categoriesBreakdown"
           :key="cat.name"
@@ -142,15 +188,24 @@ const weekBars = [
           </div>
         </div>
       </div>
+
+      <div
+        v-else
+        class="text-center py-4 text-tertiary font-body-sm text-[13px]"
+      >
+        Aucune session enregistrée pour cette période.
+      </div>
     </section>
 
-    <!-- Graphique hebdomadaire sobre -->
+    <!-- Graphique hebdomadaire dynamique -->
     <section class="bg-surface-container-lowest p-4 rounded-3xl border border-surface-container shadow-sm flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider">
           Activité de la semaine
         </span>
-        <span class="font-label-sm text-label-sm text-tertiary">Moyenne: 2h 15/j</span>
+        <span class="font-label-sm text-label-sm text-tertiary">
+          Moyenne : {{ weeklyAverageTime }}
+        </span>
       </div>
 
       <div class="flex items-end justify-between h-36 pt-4 px-2">
@@ -162,7 +217,7 @@ const weekBars = [
           <div class="w-full max-w-[24px] bg-surface-container-low rounded-t-lg h-full flex items-end overflow-hidden">
             <div
               class="w-full rounded-t-lg transition-all duration-500"
-              :class="bar.isToday ? 'bg-primary' : 'bg-surface-variant hover:bg-outline-variant'"
+              :class="bar.isToday ? 'bg-primary' : (bar.hasData ? 'bg-primary/50' : 'bg-surface-container')"
               :style="{ height: bar.height }"
             />
           </div>

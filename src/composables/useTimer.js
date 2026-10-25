@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { useSessions } from './useSessions'
 
 /**
  * Catégories de focus prédéfinies avec leurs codes couleurs du design system Serene Focus.
@@ -17,13 +18,17 @@ const durationMinutes = ref(25)
 const remainingSeconds = ref(25 * 60)
 const isRunning = ref(false)
 const selectedCategory = ref(FOCUS_CATEGORIES[0])
-const completedSessionsToday = ref(3)
-const totalMinutesToday = ref(115) // 1h55
 
 let timerInterval = null
 let targetTimestamp = null
+let sessionStartTimeStr = null
 
 export function useTimer() {
+  const { todaySessions, todayMinutes, addSession } = useSessions()
+
+  const completedSessionsToday = computed(() => todaySessions.value.length)
+  const totalMinutesToday = computed(() => todayMinutes.value)
+
   /**
    * Calcul du temps formaté (MM:SS) avec padding
    */
@@ -43,10 +48,6 @@ export function useTimer() {
 
   /**
    * Calcul de l'angle en degrés (0° à 360°)
-   * Pour 60 min -> 360° (et non pas 0° modulo !)
-   * Pour 45 min -> 270°
-   * Pour 25 min -> 150°
-   * Pour 15 min -> 90°
    */
   const currentDegrees = computed(() => {
     const secs = remainingSeconds.value
@@ -64,19 +65,13 @@ export function useTimer() {
 
   /**
    * Calcul géométrique du chemin SVG (d) pour le secteur coloré (wedge)
-   * Centre du cadran : (120, 120), rayon : 92.
-   * L'angle part de 12h (-90° cartésien) et tourne dans le sens horaire.
    */
   const svgWedgePath = computed(() => {
     const deg = currentDegrees.value
 
-    // Si 0 seconde restante, aucun secteur
     if (deg <= 0.1) return ''
-
-    // Si 60 minutes ou plus : cercle complet
     if (deg >= 359.5) return 'FULL'
 
-    // Formule trigonométrique cartésienne
     const radians = (deg - 90) * (Math.PI / 180)
     const endX = 120 + 92 * Math.cos(radians)
     const endY = 120 + 92 * Math.sin(radians)
@@ -112,7 +107,7 @@ export function useTimer() {
    * Sélection d'une durée prédéfinie (15, 25, 45, 60 minutes)
    */
   function setDuration(mins) {
-    if (isRunning.value) return // Empêche de modifier pendant que ça tourne
+    if (isRunning.value) return
     durationMinutes.value = mins
     remainingSeconds.value = mins * 60
   }
@@ -124,12 +119,20 @@ export function useTimer() {
     selectedCategory.value = cat
   }
 
+  function getNowTimeStr() {
+    const d = new Date()
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
   /**
    * Démarre la session de concentration
    */
   function startSession() {
     if (remainingSeconds.value <= 0) {
       remainingSeconds.value = durationMinutes.value * 60
+    }
+    if (!sessionStartTimeStr) {
+      sessionStartTimeStr = getNowTimeStr()
     }
     targetTimestamp = Date.now() + remainingSeconds.value * 1000
     isRunning.value = true
@@ -157,7 +160,7 @@ export function useTimer() {
 
   /**
    * Arrête définitivement la session en cours et réinitialise le cadran
-   * Comptabilise les minutes effectivement travaillées si > 1 min
+   * Enregistre les minutes effectivement travaillées si >= 1 min
    */
   function stopSession() {
     pauseSession()
@@ -165,9 +168,16 @@ export function useTimer() {
     const elapsedSecs = totalSecs - remainingSeconds.value
 
     if (elapsedSecs >= 60) {
-      totalMinutesToday.value += Math.floor(elapsedSecs / 60)
+      const minsWorked = Math.floor(elapsedSecs / 60)
+      addSession({
+        category: selectedCategory.value,
+        durationMinutes: minsWorked,
+        startTime: sessionStartTimeStr || getNowTimeStr(),
+        endTime: getNowTimeStr(),
+      })
     }
 
+    sessionStartTimeStr = null
     remainingSeconds.value = durationMinutes.value * 60
   }
 
@@ -187,8 +197,13 @@ export function useTimer() {
    */
   function completeSession() {
     pauseSession()
-    completedSessionsToday.value += 1
-    totalMinutesToday.value += durationMinutes.value
+    addSession({
+      category: selectedCategory.value,
+      durationMinutes: durationMinutes.value,
+      startTime: sessionStartTimeStr || getNowTimeStr(),
+      endTime: getNowTimeStr(),
+    })
+    sessionStartTimeStr = null
     playChime()
   }
 
