@@ -1,23 +1,24 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useSessions } from './useSessions'
+import { useSettings } from './useSettings'
 
 /**
- * Catégories de focus prédéfinies avec leurs codes couleurs du design system Serene Focus.
+ * Catégories par défaut si les paramètres ne sont pas encore chargés
  */
-export const FOCUS_CATEGORIES = [
-  { id: 'deep-work', name: 'Deep Work', color: '#ab2d2a', badgeClass: 'bg-primary' },
-  { id: 'ecriture', name: 'Écriture', color: '#a13d39', badgeClass: 'bg-secondary' },
-  { id: 'recherche', name: 'Recherche', color: '#7e7271', badgeClass: 'bg-tertiary-container' },
-  { id: 'admin', name: 'Admin & Tri', color: '#8c706e', badgeClass: 'bg-outline' },
-]
+const fallbackCategory = { id: 'deep-work', name: 'Deep Work', color: '#ab2d2a' }
 
-/**
- * État partagé (Singleton réactif)
- */
+// États partagés singleton
+const sessionMode = ref('focus') // 'focus' | 'shortBreak' | 'longBreak'
 const durationMinutes = ref(25)
 const remainingSeconds = ref(25 * 60)
 const isRunning = ref(false)
-const selectedCategory = ref(FOCUS_CATEGORIES[0])
+const selectedCategory = ref(fallbackCategory)
+const pomodoroCycleCount = ref(0) // Compteur de sessions pour pause longue tous les X cycles
+
+// Modals
+const isStopModalOpen = ref(false)
+const isTimePickerOpen = ref(false)
+const sessionCompleteNotice = ref(null) // Notification feutrée de fin de session
 
 let timerInterval = null
 let targetTimestamp = null
@@ -25,6 +26,24 @@ let sessionStartTimeStr = null
 
 export function useTimer() {
   const { todaySessions, todayMinutes, addSession } = useSessions()
+  const { settings } = useSettings()
+
+  // Initialisation de la catégorie avec les paramètres
+  if (settings.value.categories?.length > 0 && selectedCategory.value.id === fallbackCategory.id) {
+    selectedCategory.value = settings.value.categories[0]
+  }
+
+  // Synchroniser la catégorie si elle est mise à jour dans les paramètres
+  watch(() => settings.value.categories, (cats) => {
+    if (cats?.length > 0) {
+      const match = cats.find(c => c.id === selectedCategory.value.id)
+      if (match) {
+        selectedCategory.value = match
+      } else {
+        selectedCategory.value = cats[0]
+      }
+    }
+  }, { deep: true })
 
   const completedSessionsToday = computed(() => todaySessions.value.length)
   const totalMinutesToday = computed(() => todayMinutes.value)
@@ -39,8 +58,7 @@ export function useTimer() {
   })
 
   /**
-   * Détermine si le cadran doit être un cercle complet plein (ex: 60 min)
-   * Corrige le bug où 60 min faisait disparaître le rouge !
+   * Détermine si le cadran doit être un cercle complet plein (60 min)
    */
   const isFullCircle = computed(() => {
     return remainingSeconds.value >= 3600
@@ -56,15 +74,12 @@ export function useTimer() {
     return (secs / 3600) * 360
   })
 
-  /**
-   * Angle de rotation de l'aiguille
-   */
   const needleRotation = computed(() => {
     return currentDegrees.value
   })
 
   /**
-   * Calcul géométrique du chemin SVG (d) pour le secteur coloré (wedge)
+   * Calcul géométrique du chemin SVG
    */
   const svgWedgePath = computed(() => {
     const deg = currentDegrees.value
@@ -81,8 +96,7 @@ export function useTimer() {
   })
 
   /**
-   * Fenêtre temporelle estimée : heure de début -> heure de fin prévue
-   * Ex: "14:20 → 14:45"
+   * Fenêtre temporelle estimée
    */
   const horizonWindow = computed(() => {
     const now = new Date()
@@ -97,24 +111,61 @@ export function useTimer() {
   })
 
   /**
-   * État de pause active (la session a commencé mais est actuellement suspendue)
+   * État de pause active
    */
   const isPaused = computed(() => {
     return !isRunning.value && remainingSeconds.value < durationMinutes.value * 60 && remainingSeconds.value > 0
   })
 
   /**
-   * Sélection d'une durée prédéfinie (15, 25, 45, 60 minutes)
+   * Couleurs du cadran selon le mode
    */
-  function setDuration(mins) {
-    if (isRunning.value) return
-    durationMinutes.value = mins
-    remainingSeconds.value = mins * 60
+  const modeColors = computed(() => {
+    if (sessionMode.value === 'shortBreak' || sessionMode.value === 'longBreak') {
+      return {
+        primary: '#3d7a5a', // Vert sauge apaisant
+        secondary: '#70b28e',
+        light: '#e8f4ec',
+        label: sessionMode.value === 'shortBreak' ? 'Pause courte' : 'Pause longue',
+      }
+    }
+    return {
+      primary: selectedCategory.value?.color || '#ab2d2a',
+      secondary: '#ff847d',
+      light: '#ffdad6',
+      label: 'Focus',
+    }
+  })
+
+  /**
+   * Changement de mode Pomodoro (Focus, Pause courte, Pause longue)
+   */
+  function setMode(mode) {
+    if (isRunning.value) return // Empêche de changer en plein vol
+    sessionMode.value = mode
+
+    let defaultMins = 25
+    if (mode === 'focus') {
+      defaultMins = settings.value.focusDuration || 25
+    } else if (mode === 'shortBreak') {
+      defaultMins = settings.value.shortBreakDuration || 5
+    } else if (mode === 'longBreak') {
+      defaultMins = settings.value.longBreakDuration || 15
+    }
+
+    setDuration(defaultMins)
   }
 
   /**
-   * Sélection de la catégorie
+   * Sélection d'une durée (minutes)
    */
+  function setDuration(mins) {
+    if (isRunning.value) return
+    const clamped = Math.max(1, Math.min(60, Number(mins) || 25))
+    durationMinutes.value = clamped
+    remainingSeconds.value = clamped * 60
+  }
+
   function setCategory(cat) {
     selectedCategory.value = cat
   }
@@ -124,9 +175,6 @@ export function useTimer() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
-  /**
-   * Démarre la session de concentration
-   */
   function startSession() {
     if (remainingSeconds.value <= 0) {
       remainingSeconds.value = durationMinutes.value * 60
@@ -149,9 +197,6 @@ export function useTimer() {
     }, 250)
   }
 
-  /**
-   * Met en pause la session active
-   */
   function pauseSession() {
     isRunning.value = false
     clearInterval(timerInterval)
@@ -159,19 +204,32 @@ export function useTimer() {
   }
 
   /**
-   * Arrête définitivement la session en cours et réinitialise le cadran
-   * Enregistre les minutes effectivement travaillées si >= 1 min
+   * Demande de confirmation d'arrêt (ouvre la pop-up)
    */
-  function stopSession() {
+  function requestStop() {
+    isStopModalOpen.value = true
+  }
+
+  function cancelStop() {
+    isStopModalOpen.value = false
+  }
+
+  /**
+   * Confirme l'arrêt de la session
+   */
+  function confirmStop() {
+    isStopModalOpen.value = false
     pauseSession()
+
     const totalSecs = durationMinutes.value * 60
     const elapsedSecs = totalSecs - remainingSeconds.value
 
-    if (elapsedSecs >= 60) {
+    if (elapsedSecs >= 60 && sessionMode.value === 'focus') {
       const minsWorked = Math.floor(elapsedSecs / 60)
       addSession({
         category: selectedCategory.value,
         durationMinutes: minsWorked,
+        mode: sessionMode.value,
         startTime: sessionStartTimeStr || getNowTimeStr(),
         endTime: getNowTimeStr(),
       })
@@ -181,9 +239,6 @@ export function useTimer() {
     remainingSeconds.value = durationMinutes.value * 60
   }
 
-  /**
-   * Bascule entre Démarrer et Pause
-   */
   function toggleSession() {
     if (isRunning.value) {
       pauseSession()
@@ -193,23 +248,61 @@ export function useTimer() {
   }
 
   /**
-   * Fin de session réussie
+   * Fin de session réussie : gong + enchaînement Pomodoro
    */
   function completeSession() {
     pauseSession()
-    addSession({
-      category: selectedCategory.value,
-      durationMinutes: durationMinutes.value,
-      startTime: sessionStartTimeStr || getNowTimeStr(),
-      endTime: getNowTimeStr(),
-    })
-    sessionStartTimeStr = null
     playChime()
+
+    if (sessionMode.value === 'focus') {
+      // Enregistrer la session de focus
+      addSession({
+        category: selectedCategory.value,
+        durationMinutes: durationMinutes.value,
+        mode: 'focus',
+        startTime: sessionStartTimeStr || getNowTimeStr(),
+        endTime: getNowTimeStr(),
+      })
+
+      pomodoroCycleCount.value += 1
+      const isLong = pomodoroCycleCount.value % (settings.value.longBreakInterval || 4) === 0
+      const nextMode = isLong ? 'longBreak' : 'shortBreak'
+      const breakMins = isLong ? (settings.value.longBreakDuration || 15) : (settings.value.shortBreakDuration || 5)
+
+      sessionCompleteNotice.value = {
+        title: 'Session de focus accomplie !',
+        message: `Superbe concentration. Prenez ${breakMins} min de pause pour régénérer votre énergie.`,
+        nextMode,
+        nextLabel: isLong ? 'Lancer la pause longue' : 'Lancer la pause',
+      }
+    } else {
+      // Fin de pause
+      sessionCompleteNotice.value = {
+        title: 'Pause terminée',
+        message: 'Votre esprit est reposé. Prêt pour une nouvelle session de focus ?',
+        nextMode: 'focus',
+        nextLabel: 'Reprendre le focus',
+      }
+    }
+
+    sessionStartTimeStr = null
   }
 
-  /**
-   * Gong subtil de fin de session via l'API Web Audio
-   */
+  function acceptNextSession() {
+    if (sessionCompleteNotice.value) {
+      const target = sessionCompleteNotice.value.nextMode
+      sessionCompleteNotice.value = null
+      setMode(target)
+      if (settings.value.autoStartBreaks) {
+        startSession()
+      }
+    }
+  }
+
+  function dismissNotice() {
+    sessionCompleteNotice.value = null
+  }
+
   function playChime() {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext
@@ -219,7 +312,9 @@ export function useTimer() {
       const gain = ctx.createGain()
 
       osc.type = 'sine'
-      osc.frequency.setValueAtTime(528, ctx.currentTime)
+      // Son différent et apaisant selon le mode
+      const freq = sessionMode.value === 'focus' ? 528 : 432
+      osc.frequency.setValueAtTime(freq, ctx.currentTime)
 
       gain.gain.setValueAtTime(0, ctx.currentTime)
       gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05)
@@ -231,11 +326,12 @@ export function useTimer() {
       osc.start(ctx.currentTime)
       osc.stop(ctx.currentTime + 2.6)
     } catch {
-      // Ignorer si audio non autorisé
+      // Ignorer
     }
   }
 
   return {
+    sessionMode,
     durationMinutes,
     remainingSeconds,
     isRunning,
@@ -243,18 +339,27 @@ export function useTimer() {
     isFullCircle,
     currentDegrees,
     selectedCategory,
-    categories: FOCUS_CATEGORIES,
+    modeColors,
+    pomodoroCycleCount,
     formattedTime,
     needleRotation,
     svgWedgePath,
     horizonWindow,
     completedSessionsToday,
     totalMinutesToday,
+    isStopModalOpen,
+    isTimePickerOpen,
+    sessionCompleteNotice,
+    setMode,
     setDuration,
     setCategory,
     startSession,
     pauseSession,
-    stopSession,
+    requestStop,
+    cancelStop,
+    confirmStop,
     toggleSession,
+    acceptNextSession,
+    dismissNotice,
   }
 }

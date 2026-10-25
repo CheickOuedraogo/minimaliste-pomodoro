@@ -26,10 +26,17 @@ function toggleFullscreen() {
 
 const navTabs = [
   { id: 'focus', label: 'Focus', icon: 'timer' },
-  { id: 'timeline', label: 'Timeline', icon: 'calendar_today' },
   { id: 'tasks', label: 'Tâches', icon: 'check_circle' },
-  { id: 'bilan', label: 'Bilan', icon: 'bar_chart' },
+  { id: 'activity', label: 'Activité', icon: 'bar_chart' },
+  { id: 'settings', label: 'Paramètres', icon: 'settings' },
 ]
+
+const tabNames = {
+  focus: 'Focus',
+  tasks: 'Tâches',
+  activity: 'Activité & Bilan',
+  settings: 'Paramètres',
+}
 </script>
 
 <template>
@@ -44,8 +51,8 @@ const navTabs = [
           Focus
         </span>
         <span class="text-outline/40 mx-1 hidden sm:inline">/</span>
-        <span class="font-label-md text-label-md text-tertiary tracking-normal hidden sm:inline capitalize">
-          {{ currentTab }}
+        <span class="font-label-md text-label-md text-tertiary tracking-normal hidden sm:inline">
+          {{ tabNames[currentTab] || 'Focus' }}
         </span>
       </div>
 

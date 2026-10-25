@@ -1,6 +1,6 @@
 # ⏱️ Focus — Chronométrie Sereine & Productivité Cognitive
 
-Application mobile-first de concentration et de travail profond inspirée par les principes d'horlogerie minimale de Dieter Rams / Braun et le design system **Serene Focus**.
+Application mobile-first & desktop de concentration et de travail profond inspirée par les principes d'horlogerie minimale de Dieter Rams / Braun et le design system **Serene Focus**.
 
 Ce projet privilégie la **quiétude cognitive** : aucune boucle de dopamine artificielle, pas de gamification agressive ni de bannières intrusives, mais une expérience fluide, tactile et apaisante.
 
@@ -8,52 +8,47 @@ Ce projet privilégie la **quiétude cognitive** : aucune boucle de dopamine art
 
 ## ✨ Fonctionnalités Clés
 
-- **Cadran Analogique Minuté (Braun Inspired)** :
+- **Cycle Pomodoro Complet & Intuitif** :
+  - **3 modes de rythme** : *Focus*, *Pause courte* (5 min) et *Pause longue* (15 min).
+  - Bascule manuelle instantanée ou enchaînement guidé avec notification et gong apaisant (528 Hz / 432 Hz).
+  - Habillage chromatique adapté (vermillon concentré en focus, vert sauge reposant en pause).
+- **Cadran Analogique Interactif (Braun Inspired)** :
   - Cadran SVG haute précision à 60 graduations horlogères.
-  - Secteur d'avancement dynamique avec dégradé radial vermillon doux.
-  - Aiguille indicatrice pivotante et affichage numérique haute lisibilité (`tabular-nums`).
-  - Calcul automatique de la fenêtre d'horizon temporel (ex: `14:20 → 14:45`).
+  - **Réglage interactif au clic** : cliquez directement sur le cadran ou le temps digital pour ajuster la durée (curseur fin 1-60m ou pastilles rapides).
+  - Animation mécanique soyeuse par interpolation (Lerp à 60/120 fps via `requestAnimationFrame`).
+  - **Pop-up de confirmation d'arrêt** : pour éviter toute fausse manipulation lors de l'interruption d'une session.
+- **Section Paramètres Dédiée** :
+  - Configuration sur-mesure des durées de Focus, Pause courte et Pause longue.
+  - Gestion dynamique des **Catégories de concentration** (ajout, modification de nom, palette de couleurs personnalisée).
+- **Vue Activité & Bilan (Timeline + Statistiques unifiées)** :
+  - Métriques réelles (temps concentré, nombre de sessions, tâches accomplies).
+  - Semainier dynamique 7 jours (Lundi à Dimanche réels) avec déroulé chronologique des sessions.
+  - Répartition factuelle de l'attention par catégorie.
+  - Graphique hebdomadaire avec moyenne quotidienne.
 - **Moteur d'Ambiances Sonores Multi-Sources (`useAudioAmbience`)** :
-  - **Synthèse locale Web Audio API** : Générateur autonome de bruit blanc, pluie douce et café feutré (zéro consommation réseau, ultra sobre en batterie).
-  - **Support des flux YouTube** : Intégration fluide de flux musicaux d'ambiance / lo-fi en arrière-plan via l'API IFrame.
-  - **Playlists Personnalisées** : Création, gestion et écoute de playlists sur-mesure avec sauvegarde locale `localStorage`.
-  - **Import de Musiques Locales** : Possibilité d'importer ses propres fichiers audio (MP3, WAV, FLAC, AAC) directement depuis l'appareil.
-  - **Fondu Sonore Intelligent (Fade-Out)** : Atténuation progressive du volume 2 minutes avant la fin de la séance.
+  - **Synthèse locale Web Audio API** : Générateur autonome de bruit blanc, pluie douce et café feutré (zéro streaming, faible consommation).
+  - **Flux YouTube & Playlists** : Intégration en arrière-plan et création de collections personnalisées.
+  - **Import Audio Local** : Lecture de fichiers MP3/WAV/FLAC de l'utilisateur.
+  - **Fondu Sonore Intelligent (Fade-Out)** : 2 minutes avant la fin de session.
 - **Gestionnaire de Tâches Organique** :
-  - Ajout rapide avec pré-calibrage de durée (25m, 50m, Libre).
-  - Filtrage segmenté (*À faire*, *En cours*, *Accomplies*).
-  - Lancement immédiat d'une session de focus liée à une tâche.
-- **Timeline Quotidienne Chronologique** :
-  - Calendrier hebdomadaire 7 jours avec indicateur ponctuel Braun.
-  - Suivi des blocs de concentration réalisés au fil de la journée.
-- **Bilan Factuel & Analytique** :
-  - Métriques sobres (temps total concentré, taux de complétion, travail sans interruption).
-  - Répartition par catégories d'attention (Deep Work, Écriture, Recherche, Admin).
-  - Histogramme hebdomadaire d'activité.
+  - Ajout et coche au vol avant ou pendant la session.
 
 ---
 
-## 🛠️ Stack Technique & Choix d'Architecture
+## 🛠️ Stack Technique
 
 - **Framework** : [Vue 3](https://vuejs.org/) (Composition API avec `<script setup>`).
-- **Build Tool** : [Vite 8](https://vitejs.dev/) pour un rechargement à chaud ultra rapide et des builds optimisés.
-- **Styling** : [Tailwind CSS v4](https://tailwindcss.com/) avec configuration moderne via `@theme` et design tokens Serene Focus.
-- **Gestion d'État** : Composables réactifs modulaires (`useTimer.js`, `useAudioAmbience.js`) selon le patron Singleton réactif.
-- **Typographie & Icônes** : Google Fonts *Inter* et *Material Symbols Outlined*.
-- **Compatibilité Mobile & Natif** : Pensé mobile-first (safe-area insets, support PWA / Capacitor pour déploiement iOS & Android).
+- **Build Tool** : [Vite 8](https://vitejs.dev/).
+- **Styling** : [Tailwind CSS v4](https://tailwindcss.com/) avec `@theme` Serene Focus.
+- **Architecture Réactive** : Stores composables singletons (`useTimer`, `useSessions`, `useSettings`, `useTasks`, `useAudioAmbience`).
+- **Web APIs** : Web Audio API, Fullscreen API, `localStorage`.
+- **Responsive** : Split-screen 2 colonnes sur PC / Desktop (`lg:`), mobile-first avec safe-area insets sur mobile.
 
 ---
 
-## 🚀 Installation & Démarrage
+## 🚀 Démarrage
 
 ```bash
-# Cloner le dépôt
-git clone <url-du-repo>
-cd minimaliste-pomodoro
-
-# Installer les dépendances
-npm install
-
 # Lancer le serveur de développement
 npm run dev
 
@@ -63,26 +58,4 @@ npm run build
 
 ---
 
-## 📂 Organisation du Projet
-
-```
-src/
-├── assets/             # Ressources statiques
-├── components/
-│   ├── audio/          # Bottom sheet d'ambiances, mixeur & flux YouTube
-│   ├── bilan/          # Bilan factuel et métriques analytiques
-│   ├── focus/          # Cadran analogique, presets et intention
-│   ├── navigation/     # Header bar et bottom navigation
-│   ├── tasks/          # Gestionnaire de tâches et filtres
-│   └── timeline/       # Calendrier 7 jours et axe chronologique
-├── composables/
-│   ├── useAudioAmbience.js  # Moteur Web Audio, YouTube & playlists
-│   └── useTimer.js          # Horloge exacte, calculs trigonométriques SVG
-├── App.vue             # Orchestration principale
-├── main.js             # Point d'entrée de l'application
-└── style.css           # Thème Serene Focus & utilitaires CSS
-```
-
----
-
-*Développé avec soin et exigence pour le portfolio.*
+*Développé avec exigence et finesse pour le portfolio.*
